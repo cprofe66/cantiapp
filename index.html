@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Canti NC - Raccolta</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Libreria PDF.js per il rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #f59e0b; /* amber-500 */
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            scroll-behavior: smooth;
+        }
+
+        .song-card { transition: transform 0.1s ease, box-shadow 0.2s ease; }
+        .song-card:active { transform: scale(0.98); }
+
+        #pdfModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #171717;
+            z-index: 1000;
+            flex-direction: column;
+        }
+        
+        #pdfContainer {
+            width: 100%;
+            flex-grow: 1;
+            overflow: auto; 
+            display: block; 
+            padding: 10px 0;
+            -webkit-overflow-scrolling: touch;
+            text-align: center; 
+        }
+
+        canvas {
+            display: inline-block;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            background: white;
+            border-radius: 4px;
+            max-width: none; 
+        }
+
+        #introOverlay {
+            position: fixed;
+            inset: 0;
+            background: #1c1917; /* stone-900 */
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            text-align: center;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+            overflow-y: auto;
+        }
+
+        #introOverlay.hidden-intro {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        #backToTop {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 50;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 12px;
+            background: rgba(38, 38, 38, 0.9);
+            padding: 10px 16px;
+            border-radius: 16px;
+            backdrop-filter: blur(8px);
+            margin-right: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        button:active {
+            opacity: 0.7;
+        }
+
+        #copyToast {
+            display: none;
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f59e0b;
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 800;
+            z-index: 3000;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.3);
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-900 min-h-screen pb-6">
+
+    <div id="copyToast">Link Copiato!</div>
+
+    <!-- Schermata Iniziale -->
+    <div id="introOverlay">
+        <div class="mb-4 w-28 h-28 rounded-full overflow-hidden border-4 border-amber-500 shadow-2xl shadow-amber-500/20 bg-stone-800 flex items-center justify-center shrink-0">
+            <img src="icon-512.png" alt="Icona Canti NC" class="w-full h-full object-cover" onerror="this.src='https://cprofe66.github.io/cantiapp/icon-512.png'">
+        </div>
+        
+        <h1 class="text-3xl font-black text-white mb-1 tracking-tight">Canti NC</h1>
+        
+        <p class="text-stone-300 text-xs font-medium max-w-xs mb-6 leading-relaxed italic">
+            Raccolta non ufficiale (è un aiuto ai cantori per adeguare le tonalità dei canti). Fare sempre riferimento al sito ufficiale dei canti.
+        </p>
+
+        <button onclick="dismissIntro()" class="w-full max-w-xs bg-amber-500 hover:bg-amber-600 text-stone-900 font-black py-3.5 rounded-2xl transition-all active:scale-95 shadow-xl shadow-amber-500/20 uppercase tracking-widest text-sm mb-6">
+            Entra nella Raccolta
+        </button>
+        
+        <div class="w-full max-w-xs pt-4 border-t border-stone-800/50 flex flex-col items-center">
+            <p class="text-stone-500 text-[9px] font-bold uppercase tracking-widest mb-3">Accesso da PC</p>
+            <div class="w-full bg-stone-800/40 rounded-2xl p-3 border border-stone-700/30 flex flex-col items-center">
+                <p class="text-amber-500 font-mono text-[10px] break-all mb-3 select-all">https://cprofe66.github.io/cantiapp/</p>
+                <button onclick="copyAppLink()" class="w-full bg-stone-700 hover:bg-stone-600 text-white font-bold py-2 rounded-xl text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 border border-stone-600">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copia Link
+                </button>
+            </div>
+        </div>
+
+        <p class="mt-4 text-[8px] text-stone-600 uppercase tracking-[0.2em]">Versione 3.7 • Risorsa per i Cantori</p>
+    </div>
+
+    <div id="app" class="max-w-md mx-auto px-5 py-4">
+        <header class="mb-6 text-center">
+            <h1 class="text-4xl font-extrabold text-stone-800 tracking-tight">Canti NC</h1>
+            <p class="text-stone-500 text-[10px] font-medium mt-1.5 max-w-[280px] mx-auto leading-tight">
+                Scaricare il canto per averlo disponibile anche senza rete (lo troverai nella cartella DOWNLOAD di telefono o tablet).
+            </p>
+            <div class="h-1 w-10 bg-amber-500 mx-auto mt-3 rounded-full"></div>
+        </header>
+
+        <!-- Barra di Ricerca -->
+        <div class="relative mb-5 group">
+            <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 w-5 h-5 transition-colors group-focus-within:text-amber-500"></i>
+            <input 
+                type="text" 
+                id="searchInput"
+                placeholder="Cerca titolo o testo..." 
+                class="w-full pl-11 pr-11 py-3.5 rounded-2xl border-none shadow-sm ring-1 ring-stone-200 focus:ring-2 focus:ring-amber-500 outline-none transition-all text-base"
+            >
+            <button id="clearSearch" class="hidden absolute right-4 top-1/2 -translate-y-1/2 text-stone-400">
+                <i data-lucide="x-circle" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Filtri -->
+        <div class="flex gap-2.5 mb-4 justify-center">
+            <button onclick="setFilter('all')" id="btn-all" class="filter-btn px-5 py-2 rounded-full text-xs font-semibold transition-all">Tutti</button>
+            <button onclick="setFilter('M')" id="btn-M" class="filter-btn px-4 py-2 rounded-full text-xs font-semibold transition-all">Maschile</button>
+            <button onclick="setFilter('F')" id="btn-F" class="filter-btn px-4 py-2 rounded-full text-xs font-semibold transition-all">Femminile</button>
+        </div>
+
+        <div id="resultsCount" class="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4 px-1"></div>
+        <div id="resultsList" class="grid gap-2.5 pb-8"></div>
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-16 text-center">
+            <i data-lucide="music-4" class="w-10 h-10 text-stone-300 mb-3"></i>
+            <p class="text-stone-500 text-sm font-medium">Nessun canto trovato</p>
+        </div>
+    </div>
+
+    <button id="backToTop" onclick="scrollToTop()" class="bg-white p-2.5 rounded-full shadow-lg ring-1 ring-stone-200 text-amber-600 active:scale-90 transition-transform">
+        <i data-lucide="arrow-up" class="w-5.5 h-5.5"></i>
+    </button>
+
+    <!-- Modal PDF -->
+    <div id="pdfModal">
+        <nav class="bg-stone-900/80 backdrop-blur-md text-white p-2 flex items-center justify-between sticky top-0 z-30 border-b border-stone-800">
+            <button onclick="closePdf()" class="flex items-center justify-center w-10 h-10 text-stone-300 active:scale-90">
+                <i data-lucide="arrow-left" class="w-6 h-6"></i>
+            </button>
+            <div class="flex-1 px-2 overflow-hidden text-center">
+                <span id="songTitleDisplay" class="text-[10px] font-bold truncate block text-amber-400 uppercase tracking-wide"></span>
+            </div>
+            <div class="flex items-center">
+                <div class="zoom-controls">
+                    <button onclick="adjustZoom(-0.25)" class="w-7 h-7 flex items-center justify-center text-stone-300 hover:text-white"><i data-lucide="zoom-out" class="w-5 h-5"></i></button>
+                    <button onclick="adjustZoom(0.25)" class="w-7 h-7 flex items-center justify-center text-stone-300 hover:text-white"><i data-lucide="zoom-in" class="w-5 h-5"></i></button>
+                </div>
+                <button id="directLinkBtn" class="bg-amber-600 text-white px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all ml-1">Scarica</button>
+            </div>
+        </nav>
+        <div id="pdfLoader" class="loader-container bg-stone-900 flex flex-col items-center justify-center absolute inset-0 z-10" style="display:none;">
+            <div id="loaderSpin" class="animate-spin rounded-full h-10 w-10 border-4 border-stone-700 border-t-amber-500 mb-3"></div>
+            <p id="loaderText" class="text-stone-400 text-xs font-medium">Preparazione spartito...</p>
+            <button id="errorRetryBtn" class="hidden mt-4 bg-amber-500 text-black px-4 py-2 rounded-xl font-bold text-xs uppercase" onclick="closePdf()">Torna alla lista</button>
+        </div>
+        <div id="pdfContainer"></div>
+    </div>
+
+    <script>
+        const BASE_SITE_URL = "https://cprofe66.github.io/cantiapp/";
+        const folderPath = "pdf/";
+        
+        // Specifica la versione esatta del worker per evitare disallineamenti
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // Database dei canti
+        const songDatabase = [
+            { id: 1, titolo: "Abbà Padre", tonalita: "F", fileName: "Abbà Padre F.pdf", tags: "" },
+            { id: 2, titolo: "Abbà Padre", tonalita: "M", fileName: "Abbà Padre M.pdf", tags: "" },
+            { id: 3, titolo: "Abramo", tonalita: "F", fileName: "Abramo F.pdf", tags: "" },
+            { id: 4, titolo: "Acclamate al Signore", tonalita: "F", fileName: "Acclamate al Signore F.pdf", tags: "" },
+            { id: 5, titolo: "Acclamate al Signore", tonalita: "M", fileName: "Acclamate al Signore M.pdf", tags: "" },
+            { id: 6, titolo: "Al risveglio mi sazierò del tuo volto", tonalita: "F", fileName: "Al risveglio mi sazierò F.pdf", tags: "" },
+            { id: 7, titolo: "Al risveglio mi sazierò del tuo volto", tonalita: "M", fileName: "Al risveglio mi sazierò M.pdf", tags: "" },
+            { id: 8, titolo: "Alzate o porte", tonalita: "F", fileName: "Alzate o porte F.pdf", tags: "" },
+            { id: 9, titolo: "Alzo gli occhi verso i monti", tonalita: "F", fileName: "Alzo gli occhi verso i monti F.pdf", tags: "" },
+            { id: 10, titolo: "Amen Amen Amen", tonalita: "F", fileName: "Amen Amen Amen F.pdf", tags: "" },
+            { id: 11, titolo: "Amen Amen Amen", tonalita: "M", fileName: "Amen Amen Amen M.pdf", tags: "" },
+            { id: 12, titolo: "Amo il Signore", tonalita: "F", fileName: "Amo il Signore F.pdf", tags: "" },
+            { id: 13, titolo: "Andate e annunciate ai miei fratelli", tonalita: "F", fileName: "Andate e annunciate ai miei fratelli F.pdf", tags: "" },
+            { id: 14, titolo: "Benedetta sei tu Maria", tonalita: "F", fileName: "Benedetta sei tu Maria F.pdf", tags: "" },
+            { id: 15, titolo: "Benedetta sei tu Maria", tonalita: "M", fileName: "Benedetta sei tu Maria M.pdf", tags: "" },
+            { id: 16, titolo: "Benedici anima mia Jahvè", tonalita: "F", fileName: "Benedici anima mia Jahvè F.pdf", tags: "" },
+            { id: 17, titolo: "Benedici anima mia Jahvè", tonalita: "M", fileName: "Benedici anima mia Jahvè M.pdf", tags: "" },
+            { id: 18, titolo: "Benedictus", tonalita: "F", fileName: "Benedictus F.pdf", tags: "cantico di zaccaria" },
+            { id: 19, titolo: "Benedirò il Signore in ogni tempo", tonalita: "F", fileName: "Benedirò il Signore in ogni tempo F.pdf", tags: "" },
+            { id: 20, titolo: "Benedirò il Signore in ogni tempo", tonalita: "M", fileName: "Benedirò il Signore in ogni tempo M.pdf", tags: "" },
+            { id: 21, titolo: "C'erano due angeli", tonalita: "F", fileName: "C erano due angeli F.pdf", tags: "" },
+            { id: 22, titolo: "Cantico di Mosè", tonalita: "M", fileName: "Cantico di Mosè M.pdf", tags: "" },
+            { id: 23, titolo: "Canto dei tre giovani nella fornace II", tonalita: "F", fileName: "Canto giovani fornace 2 F.pdf", tags: "" },
+            { id: 231, titolo: "Canto dei tre giovani nella fornace I", tonalita: "F", fileName: "Canto giovani fornace 1 F.pdf", tags: "" },
+            { id: 24, titolo: "Caritas Christi", tonalita: "M", fileName: "Caritas Christi M.pdf", tags: "" },
+            { id: 25, titolo: "Che belle sono le tue tende", tonalita: "F", fileName: "Che belle sono le tue tende F.pdf", tags: "" },
+            { id: 26, titolo: "Che belle sono le tue tende", tonalita: "M", fileName: "Che belle sono le tue tende M.pdf", tags: "" },
+            { id: 27, titolo: "Che mi baci", tonalita: "F", fileName: "Che mi baci F.pdf", tags: "" },
+            { id: 28, titolo: "Chi ci separerà", tonalita: "F", fileName: "Chi ci separerà F.pdf", tags: "" },
+            { id: 29, titolo: "Chi è colei", tonalita: "F", fileName: "Chi è colei F.pdf", tags: "" },
+            { id: 30, titolo: "Come è bello come da gioia", tonalita: "F", fileName: "Come è bello come da gioia F.pdf", tags: "" },
+            { id: 31, titolo: "Come è bello come da gioia", tonalita: "M", fileName: "Come è bello come da gioia M.pdf", tags: "" },
+            { id: 32, titolo: "Come la cerva anela", tonalita: "F", fileName: "Come la cerva anela F.pdf", tags: "" },
+            { id: 33, titolo: "Come la cerva anela", tonalita: "M", fileName: "Come la cerva anela M.pdf", tags: "" },
+            { id: 34, titolo: "Come pecora che vede", tonalita: "F", fileName: "Come pecora che vede F.pdf", tags: "" },
+            { id: 35, titolo: "Come pecora che vede", tonalita: "M", fileName: "Come pecora che vede M.pdf", tags: "" },
+            { id: 36, titolo: "Come stilla il miele", tonalita: "F", fileName: "Come stilla il miele F.pdf", tags: "" },
+            { id: 37, titolo: "Come stilla il miele", tonalita: "M", fileName: "Come stilla il miele M.pdf", tags: "" },
+            { id: 38, titolo: "Consolate il mio popolo", tonalita: "F", fileName: "Consolate il mio popolo F.pdf", tags: "" },
+            { id: 39, titolo: "Consolate il mio popolo", tonalita: "M", fileName: "Consolate il mio popolo M.pdf", tags: "" },
+            { id: 40, titolo: "Dajenu", tonalita: "F", fileName: "Dajenu F.pdf", tags: "" },
+            { id: 41, titolo: "Dal profondo te grido", tonalita: "F", fileName: "Dal profondo a te grido F.pdf", tags: "" },
+            { id: 42, titolo: "Dal profondo te grido", tonalita: "M", fileName: "Dal profondo a te grido M.pdf", tags: "" },
+            { id: 43, titolo: "Davanti agli angeli", tonalita: "F", fileName: "Davanti agli angeli F.pdf", tags: "" },
+            { id: 44, titolo: "Davanti agli angeli", tonalita: "M", fileName: "Davanti agli angeli M.pdf", tags: "" },
+            { id: 45, titolo: "Dice il Signore al mio Signore", tonalita: "F", fileName: "Dice il Signore al mio Signore F.pdf", tags: "" },
+            { id: 46, titolo: "Dite agli smarriti di cuore", tonalita: "F", fileName: "Dite agli smarriti F.pdf", tags: "" },
+            { id: 47, titolo: "Dite agli smarriti di cuore", tonalita: "M", fileName: "Dite agli smarriti M.pdf", tags: "" },
+            { id: 48, titolo: "E' paziente", tonalita: "F", fileName: "E paziente F.pdf", tags: "" },
+            { id: 49, titolo: "Esultate giusti", tonalita: "F", fileName: "Esultate giusti F.pdf", tags: "" },
+            { id: 50, titolo: "Felice l'uomo", tonalita: "F", fileName: "Felice l uomo F.pdf", tags: "" },
+            { id: 51, titolo: "Figlie di Gerusalemme", tonalita: "F", fileName: "Figlie di Gerusalemme F.pdf", tags: "" },
+            { id: 52, titolo: "Fuggi mio diletto", tonalita: "F", fileName: "Fuggi mio diletto F.pdf", tags: "" },
+            { id: 53, titolo: "Gerusalemme ricostruita", tonalita: "F", fileName: "Gerusalemme ricostruita F.pdf", tags: "" },
+            { id: 54, titolo: "Gesù percorreva tutte le città", tonalita: "F", fileName: "Gesù percorreva F.pdf", tags: "" },
+            { id: 55, titolo: "Giacobbe", tonalita: "F", fileName: "Giacobbe F.pdf", tags: "" },
+            { id: 56, titolo: "Gloria", tonalita: "F", fileName: "Gloria F.pdf", tags: "" },
+            { id: 57, titolo: "Gloria", tonalita: "M", fileName: "Gloria M.pdf", tags: "" },
+            { id: 58, titolo: "Grazie a Jahvè", tonalita: "F", fileName: "Grazie a Jahvè F.pdf", tags: "" },
+            { id: 59, titolo: "Grazie a Jahvè", tonalita: "M", fileName: "Grazie a Jahvè M.pdf", tags: "" },
+            { id: 60, titolo: "Gridate con gioia", tonalita: "F", fileName: "Gridate con Gioia F.pdf", tags: "" },
+            { id: 61, titolo: "Ho sperato ho sperato", tonalita: "F", fileName: "Ho sperato ho sperato F.pdf", tags: "" },
+            { id: 62, titolo: "Ho steso le mie mani", tonalita: "F", fileName: "Ho steso le mie mani F.pdf", tags: "" },
+            { id: 63, titolo: "Ho steso le mie mani", tonalita: "M", fileName: "Ho steso le mie mani M.pdf", tags: "" },
+            { id: 64, titolo: "Il popolo che camminava nelle tenebre", tonalita: "F", fileName: "Il popolo che camminava F.pdf", tags: "" },
+            { id: 65, titolo: "Il Signore mi ha dato", tonalita: "F", fileName: "Il Signore mi ha dato F.pdf", tags: "" },
+            { id: 66, titolo: "Il Signore mi ha dato", tonalita: "M", fileName: "Il Signore mi ha dato M.pdf", tags: "" },
+            { id: 67, titolo: "Lo Spirito del Signore è sopra di me", tonalita: "F", fileName: "Lo Spirito del Signore è sopra F.pdf", tags: "" },
+            { id: 68, titolo: "Maria piccola Maria", tonalita: "F", fileName: "Maria piccola Maria F.pdf", tags: "" },
+            { id: 69, titolo: "Maria piccola Maria", tonalita: "M", fileName: "Maria piccola Maria M.pdf", tags: "" },
+            { id: 70, titolo: "Mi indicherai il sentiero della vita", tonalita: "F", fileName: "Mi indicherai il sentiero della vita F.pdf", tags: "" },
+            { id: 71, titolo: "Mi indicherai il sentiero della vita", tonalita: "M", fileName: "Mi indicherai il sentiero della vita M.pdf", tags: "" },
+            { id: 72, titolo: "O Gesù amore mio", tonalita: "F", fileName: "O Gesù amore mio F.pdf", tags: "" },
+            { id: 73, titolo: "O Signore nostro Dio", tonalita: "F", fileName: "O Signore nostro Dio F.pdf", tags: "" },
+            { id: 74, titolo: "Pentecoste", tonalita: "F", fileName: "Pentecoste F.pdf", tags: "" },
+            { id: 75, titolo: "Portami in Cielo", tonalita: "F", fileName: "Portami in Cielo F.pdf", tags: "" },
+            { id: 76, titolo: "Risuscitò", tonalita: "F", fileName: "Risuscitò F.pdf", tags: "" },
+            { id: 77, titolo: "Risuscitò", tonalita: "M", fileName: "Risuscitò M.pdf", tags: "" },
+            { id: 78, titolo: "Salve Regina dei cieli", tonalita: "F", fileName: "Salve Regina dei cieli F.pdf", tags: "" },
+            { id: 79, titolo: "Salve Regina dei cieli", tonalita: "M", fileName: "Salve Regina dei cieli M.pdf", tags: "" },
+            { id: 80, titolo: "Santo delle palme", tonalita: "F", fileName: "Santo delle palme F.pdf", tags: "" },
+            { id: 81, titolo: "Santo delle palme", tonalita: "M", fileName: "Santo delle palme M.pdf", tags: "" },
+            { id: 82, titolo: "Santo è Santo", tonalita: "F", fileName: "Santo è Santo F.pdf", tags: "" },
+            { id: 83, titolo: "Santo è Santo", tonalita: "M", fileName: "Santo è Santo M.pdf", tags: "" },
+            { id: 84, titolo: "Santo Roma 1977", tonalita: "F", fileName: "Santo Roma 1977 F.pdf", tags: "" },
+            { id: 85, titolo: "Santo Roma 1977", tonalita: "M", fileName: "Santo Roma 1977 M.pdf", tags: "" },
+            { id: 86, titolo: "Santo Santo Santo", tonalita: "F", fileName: "Santo Santo Santo F.pdf", tags: "" },
+            { id: 87, titolo: "Santo Santo Santo", tonalita: "M", fileName: "Santo Santo Santo M.pdf", tags: "" },
+            { id: 88, titolo: "Ti amo Signore", tonalita: "F", fileName: "Ti amo Signore F.pdf", tags: "" },
+            { id: 89, titolo: "Ti amo Signore", tonalita: "M", fileName: "Ti amo Signore M.pdf", tags: "" },
+            { id: 90, titolo: "Tu hai ricoperto di vergona la morte", tonalita: "F", fileName: "Tu hai ricoperto F.pdf", tags: "" },
+            { id: 91, titolo: "Tu hai ricoperto di vergona la morte", tonalita: "M", fileName: "Tu hai ricoperto M.pdf", tags: "" },
+            { id: 92, titolo: "Vedo i cieli aperti", tonalita: "F", fileName: "Vedo i cieli aperti F.pdf", tags: "" },
+            { id: 93, titolo: "Vedo i cieli aperti", tonalita: "M", fileName: "Vedo i cieli aperti M.pdf", tags: "" },
+            { id: 94, titolo: "Vieni dal libano", tonalita: "F", fileName: "Vieni dal Libano F.pdf", tags: "" },
+            { id: 95, titolo: "Guardate come è bello", tonalita: "F", fileName: "Guardate come e bello F.pdf", tags: "" },
+            { id: 96, titolo: "Guardate come è bello gustate quanto è soave", tonalita: "F", fileName: "Guardate gustate F.pdf", tags: "" },
+            { id: 98, titolo: "Gustate e vedete", tonalita: "F", fileName: "Gustate e vedete F.pdf", tags: "" },
+            { id: 99, titolo: "Gustate e vedete", tonalita: "M", fileName: "Gustate e vedete M.pdf", tags: "" },
+            { id: 100, titolo: "Il Messia leone per vincere", tonalita: "F", fileName: "Il messia F.pdf", tags: "" },
+            { id: 101, titolo: "Il Messia leone per vincere", tonalita: "M", fileName: "Il messia M.pdf", tags: "" },
+            { id: 102, titolo: "Il pigiatore", tonalita: "F", fileName: "Il pigiatore F.pdf", tags: "" },
+            { id: 103, titolo: "Il Signore è il mio pastore", tonalita: "F", fileName: "Il Signore mio pastore F.pdf", tags: "" },
+            { id: 104, titolo: "In mezzo a una grande folla", tonalita: "F", fileName: "In mezzo folla F.pdf", tags: "" },
+            { id: 105, titolo: "In una notte oscura", tonalita: "F", fileName: "In notte oscura F.pdf", tags: "" },
+            { id: 106, titolo: "Inno alla carità", tonalita: "F", fileName: "Inno carita F.pdf", tags: "" },
+            { id: 107, titolo: "Inno alla carità", tonalita: "M", fileName: "Inno carita M.pdf", tags: "" },
+            { id: 108, titolo: "Inno alla kenosis Cristo Gesù è risorto", tonalita: "F", fileName: "Inno kenosis Gesu risorto F.pdf", tags: "" },
+            { id: 109, titolo: "La mietitura delle nazioni", tonalita: "F", fileName: "La mietitura F.pdf", tags: "" },
+            { id: 110, titolo: "La mietitura delle nazioni", tonalita: "M", fileName: "La mietitura M.pdf", tags: "" },
+            { id: 111, titolo: "Misericordia Dio", tonalita: "F", fileName: "Misericordia Dio F.pdf", tags: "" },
+            { id: 112, titolo: "Noli me tangere", tonalita: "F", fileName: "Noli tangere F.pdf", tags: "" },
+            { id: 113, titolo: "Noli me tangere", tonalita: "M", fileName: "Noli tangere M.pdf", tags: "" },
+            { id: 114, titolo: "Non c'è in lui bellezza", tonalita: "F", fileName: "Non bellezza F.pdf", tags: "" },
+            { id: 115, titolo: "O Dio tu sei il mio Dio", tonalita: "F", fileName: "O Dio tu sei F.pdf", tags: "" },
+            { id: 116, titolo: "O Dio tu sei il mio Dio", tonalita: "M", fileName: "O Dio tu sei M.pdf", tags: "" },
+            { id: 117, titolo: "O morte dov'è la tua vittoria", tonalita: "F", fileName: "O morte F.pdf", tags: "" },
+            { id: 118, titolo: "Per amore dei miei fratelli", tonalita: "F", fileName: "Per amore F.pdf", tags: "" },
+            { id: 119, titolo: "Pietà di me o Dio", tonalita: "F", fileName: "Pieta di me Dio F.pdf", tags: "" },
+            { id: 120, titolo: "Pietà di me o Dio", tonalita: "M", fileName: "Pieta di me Dio M.pdf", tags: "" },
+            { id: 121, titolo: "Rivestitevi dell'armatura di Dio", tonalita: "F", fileName: "Rivestitevi dell armatura F.pdf", tags: "" },
+            { id: 122, titolo: "Zaccheo", tonalita: "F", fileName: "Zaccheo F.pdf", tags: "" },
+            { id: 123, titolo: "Voglio andare a Gerusalemme", tonalita: "F", fileName: "Voglio andare F.pdf", tags: "" },
+            { id: 124, titolo: "Venite a me voi tutti", tonalita: "F", fileName: "Venite a me F.pdf", tags: "" },
+            { id: 125, titolo: "Viene il Signore vestito di maestà", tonalita: "F", fileName: "Viene il Signore F.pdf", tags: "" },
+            { id: 126, titolo: "Voglio cantare", tonalita: "F", fileName: "Voglio cantare F.pdf", tags: "" },
+            { id: 127, titolo: "Vieni Spirito creatore", tonalita: "F", fileName: "Vieni Spirito creatore F.pdf", tags: "" },
+            { id: 128, titolo: "Vieni Spirito creatore", tonalita: "M", fileName: "Vieni Spirito creatore M.pdf", tags: "" },
+            { id: 129, titolo: "Voi siete la luce del mondo", tonalita: "F", fileName: "Voi siete luce F.pdf", tags: "" },
+            { id: 130, titolo: "Voi siete la luce del mondo", tonalita: "M", fileName: "Voi siete luce M.pdf", tags: "" },
+            { id: 131, titolo: "Una donna vestita di sole", tonalita: "F", fileName: "Una donna vestita F.pdf", tags: "" },
+            { id: 132, titolo: "Una donna vestita di sole", tonalita: "M", fileName: "Una donna vestita M.pdf", tags: "" },
+            { id: 133, titolo: "Vergine della meraviglia", tonalita: "F", fileName: "Vergine meraviglia F.pdf", tags: "" },
+            { id: 134, titolo: "Vergine della meraviglia", tonalita: "M", fileName: "Vergine meraviglia M.pdf", tags: "" },
+            { id: 136, titolo: "Tu sei il più bello", tonalita: "F", fileName: "Tu sei il bello F.pdf", tags: "" },
+            { id: 137, titolo: "Quanto sono amabili le tue dimore", tonalita: "F", fileName: "Quanto sono amabili F.pdf", tags: "" },
+            { id: 138, titolo: "Sale Dio tra acclamazioni", tonalita: "F", fileName: "Sale Dio F.pdf", tags: "" },
+            { id: 139, titolo: "Vi prenderò tra le genti", tonalita: "F", fileName: "Vi prendero genti F.pdf", tags: "" },
+            { id: 140, titolo: "Vi prenderò tra le genti", tonalita: "M", fileName: "Vi prendero genti M.pdf", tags: "" },
+            { id: 141, titolo: "Ti vedranno i Re", tonalita: "F", fileName: "Ti vedranno F.pdf", tags: "" },
+            { id: 142, titolo: "Ti vedranno i Re", tonalita: "M", fileName: "Ti vedranno M.pdf", tags: "" },
+            { id: 143, titolo: "Verso te o città santa", tonalita: "F", fileName: "Verso te citta F.pdf", tags: "" },
+            { id: 144, titolo: "O Signore nostro Dio", tonalita: "M", fileName: "O Signore nostro Dio M.pdf", tags: "" },
+            { id: 145, titolo: "Un germoglio spunta dal tronco", tonalita: "F", fileName: "Un germoglio F.pdf", tags: "" },
+            { id: 146, titolo: "Un germoglio spunta dal tronco", tonalita: "M", fileName: "Un germoglio M.pdf", tags: "" },
+            { id: 147, titolo: "Ti sto chiamando", tonalita: "F", fileName: "Ti sto chiamando F.pdf", tags: "" },
+            { id: 148, titolo: "Sola a solo", tonalita: "F", fileName: "Sola a solo F.pdf", tags: "" },
+            { id: 149, titolo: "Sola a solo", tonalita: "M", fileName: "Sola a solo M.pdf", tags: "" },
+            { id: 150, titolo: "Sorga Dio", tonalita: "F", fileName: "Sorga Dio F.pdf", tags: "" },
+            { id: 151, titolo: "Shlom lech Mariam", tonalita: "F", fileName: "Shlom lech F.pdf", tags: "" },
+            { id: 152, titolo: "Ti ho manifestato il mio peccato", tonalita: "F", fileName: "Ti ho manifestato F.pdf", tags: "" },
+            { id: 153, titolo: "Tu che sei fedele", tonalita: "F", fileName: "Tu che sei fedele F.pdf", tags: "" },
+            { id: 154, titolo: "Giorno di riposo", tonalita: "F", fileName: "Giorno di riposo F.pdf", tags: "" },
+            { id: 155, titolo: "Sequenza di Pentecoste - Vieni Spirito Santo", tonalita: "M", fileName: "Vieni Spirito Santo M.pdf", tags: "pentecoste, sequenza" },
+            { id: 156, titolo: "Stabat Mater", tonalita: "M", fileName: "Stabat mater M.pdf", tags: "" },
+            { id: 157, titolo: "Se nel Signore mi sono rifugiato", tonalita: "M", fileName: "Se Signore rifugiato M.pdf", tags: "" },
+            { id: 158, titolo: "Se il Signore non costruisce la casa", tonalita: "F", fileName: "Se Signore costruisce F.pdf", tags: "" },
+            { id: 159, titolo: "Se il Signore non costruisce la casa", tonalita: "M", fileName: "Se Signore costruisce M.pdf", tags: "" },
+            { id: 160, titolo: "Se siete risorti con Cristo", tonalita: "F", fileName: "Se siete risorti F.pdf", tags: "" },
+            { id: 161, titolo: "Se siete risorti con Cristo", tonalita: "M", fileName: "Se siete risorti M.pdf", tags: "" },
+            { id: 162, titolo: "Se oggi ascoltate la sua voce", tonalita: "F", fileName: "Se oggi ascoltate F.pdf", tags: "" },
+            { id: 163, titolo: "Se oggi ascoltate la sua voce", tonalita: "M", fileName: "Se oggi ascoltate M.pdf", tags: "" },
+            { id: 164, titolo: "Il Signore è mia luce e mia salvezza", tonalita: "F", fileName: "Il Signore è mia F.pdf", tags: "" },
+            { id: 165, titolo: "Alla cena dell'Agnello", tonalita: "F", fileName: "Alla cena agnello F.pdf", tags: "" },
+            { id: 166, titolo: "Alla cena dell'Agnello", tonalita: "M", fileName: "Alla cena agnello M.pdf", tags: "" },
+            { id: 167, titolo: "Come lo slancio dell'ira", tonalita: "F", fileName: "Come slancio F.pdf", tags: "" },
+            { id: 168, titolo: "Giacobbe", tonalita: "M", fileName: "Giacobbe M.pdf", tags: "" },
+            { id: 169, titolo: "Il seminatore", tonalita: "F", fileName: "Il seminatore F.pdf", tags: "" },
+            { id: 170, titolo: "Il seminatore", tonalita: "M", fileName: "Il seminatore M.pdf", tags: "" },
+            { id: 171, titolo: "Inno alla croce gloriosa", tonalita: "F", fileName: "Inno croce gloriosa F.pdf", tags: "" },
+            { id: 172, titolo: "La mia diletta è per me", tonalita: "F", fileName: "La mia diletta F.pdf", tags: "" },
+            { id: 173, titolo: "Lo stesso Iddio", tonalita: "F", fileName: "Lo stesso iddio F.pdf", tags: "" },
+            { id: 174, titolo: "Mi rubasti il cuore", tonalita: "F", fileName: "Mi rubasti F.pdf", tags: "" },
+            { id: 175, titolo: "Mi rubasti il cuore", tonalita: "M", fileName: "Mi rubasti M.pdf", tags: "" },
+            { id: 176, titolo: "Nessuno può servire due padroni", tonalita: "F", fileName: "Nessuno servire padroni F.pdf", tags: "" },
+            { id: 177, titolo: "Nessuno può servire due padroni", tonalita: "M", fileName: "Nessuno servire padroni M.pdf", tags: "" },
+            { id: 178, titolo: "Non resistete al male", tonalita: "F", fileName: "Non resistete male F.pdf", tags: "" },
+            { id: 179, titolo: "Non resistete al male", tonalita: "M", fileName: "Non resistete male M.pdf", tags: "" },
+            { id: 180, titolo: "Shemà Israel", tonalita: "F", fileName: "Shema F.pdf", tags: "" },
+            { id: 181, titolo: "Shemà Israel", tonalita: "M", fileName: "Shema M.pdf", tags: "" },
+            { id: 182, titolo: "Siedi solitario e silenzioso", tonalita: "F", fileName: "Siedi solitario F.pdf", tags: "" },
+            { id: 183, titolo: "Siedi solitario e silenzioso", tonalita: "M", fileName: "Siedi solitario M.pdf", tags: "" },
+            { id: 184, titolo: "Signore tu mi scruti e mi conosci", tonalita: "F", fileName: "Signore mi scruti F.pdf", tags: "" },
+            { id: 185, titolo: "Tu sei bella amica mia", tonalita: "F", fileName: "Tu sei bella amica F.pdf", tags: "" },
+            { id: 186, titolo: "Tu sei bella amica mia", tonalita: "M", fileName: "Tu sei bella amica M.pdf", tags: "" },
+            { id: 187, titolo: "Acclamazione al Vangelo - Alleluia", tonalita: "F", fileName: "Acclam vang alleluia F.pdf", tags: "" },
+            { id: 188, titolo: "Acclamazione al Vangelo - Quaresima", tonalita: "F", fileName: "Acclam vang quaresima F.pdf", tags: "" },
+            { id: 189, titolo: "Acclamazione al Vangelo - Quaresima", tonalita: "M", fileName: "Acclam vang quaresima M.pdf", tags: "" },
+            { id: 190, titolo: "Alla tua luce Signore vediamo la luce", tonalita: "F", fileName: "Alla tua luce Signore F.pdf", tags: "" },
+            { id: 191, titolo: "Alla tua luce Signore vediamo la luce", tonalita: "M", fileName: "Alla tua luce Signore M.pdf", tags: "" },
+            { id: 192, titolo: "Credo", tonalita: "F", fileName: "Credo F.pdf", tags: "" },
+            { id: 193, titolo: "Il popolo che camminava nelle tenebre", tonalita: "M", fileName: "Il popolo M.pdf", tags: "" },
+            { id: 194, titolo: "Preconio Pasquale", tonalita: "F", fileName: "Preconio F.pdf", tags: "" },
+            { id: 195, titolo: "Preconio Pasquale", tonalita: "M", fileName: "Preconio M.pdf", tags: "" },
+            { id: 196, titolo: "Risposta alle preghiere", tonalita: "F", fileName: "Risposta preghiere F.pdf", tags: "" },
+            { id: 197, titolo: "Te Deum", tonalita: "F", fileName: "Te deum F.pdf", tags: "" },
+            { id: 198, titolo: "Te Deum", tonalita: "M", fileName: "Te deum M.pdf", tags: "" },
+            { id: 199, titolo: "Carmen '63", tonalita: "M", fileName: "Carmen63.pdf", tags: "" },
+            { id: 200, titolo: "Fuggi mio diletto", tonalita: "M", fileName: "fuggi mio diletto M.pdf", tags: "" }
+        ];
+
+        let currentFilter = 'all';
+        let currentPdf = null;
+        let currentZoom = 1.0;
+        let isRendering = false;
+        
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearch');
+        const resultsList = document.getElementById('resultsList');
+        const resultsCount = document.getElementById('resultsCount');
+        const pdfModal = document.getElementById('pdfModal');
+        const pdfContainer = document.getElementById('pdfContainer');
+        const introOverlay = document.getElementById('introOverlay');
+
+        function dismissIntro() {
+            if(introOverlay) introOverlay.classList.add('hidden-intro');
+        }
+
+        function copyAppLink() {
+            const tempInput = document.createElement("input");
+            tempInput.value = BASE_SITE_URL;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            const toast = document.getElementById('copyToast');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2000);
+        }
+
+        function normalizeStr(s) {
+            return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        }
+
+        async function openPdf(fileName, title) {
+            document.getElementById('songTitleDisplay').innerText = title;
+            pdfModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            pdfContainer.innerHTML = ''; 
+            
+            // Reset loader state
+            const loader = document.getElementById('pdfLoader');
+            const spin = document.getElementById('loaderSpin');
+            const text = document.getElementById('loaderText');
+            const retryBtn = document.getElementById('errorRetryBtn');
+            
+            loader.style.display = 'flex';
+            spin.classList.remove('hidden');
+            text.innerText = "Preparazione spartito...";
+            text.classList.remove('text-red-500');
+            retryBtn.classList.add('hidden');
+
+            // Codifico correttamente il nome del file per gestire spazi e accenti
+            const encodedFileName = encodeURIComponent(fileName);
+            const url = BASE_SITE_URL + folderPath + encodedFileName;
+            document.getElementById('directLinkBtn').onclick = () => window.open(url, '_blank');
+
+            console.log("Tentativo di caricamento URL:", url);
+
+            try {
+                const loadingTask = pdfjsLib.getDocument({
+                    url: url,
+                    withCredentials: false // Importante per GitHub Pages
+                });
+                
+                currentPdf = await loadingTask.promise;
+                
+                const firstPage = await currentPdf.getPage(1);
+                const originalViewport = firstPage.getViewport({ scale: 1.0 });
+                const targetWidth = window.innerWidth * 0.95;
+                currentZoom = targetWidth / originalViewport.width;
+                
+                await renderPdfPages();
+            } catch (e) {
+                console.error("Errore PDF.js:", e);
+                spin.classList.add('hidden');
+                text.innerText = "Errore: il file non è stato trovato o l'accesso è negato.";
+                text.classList.add('text-red-500');
+                retryBtn.classList.remove('hidden');
+            }
+        }
+
+        async function renderPdfPages() {
+            if (isRendering || !currentPdf) return;
+            isRendering = true;
+            document.getElementById('pdfLoader').style.display = 'flex';
+            pdfContainer.innerHTML = '';
+            try {
+                for (let i = 1; i <= currentPdf.numPages; i++) {
+                    const page = await currentPdf.getPage(i);
+                    const viewport = page.getViewport({ scale: currentZoom });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+                    
+                    await page.render(renderContext).promise;
+                    pdfContainer.appendChild(canvas);
+                }
+            } catch (err) {
+                console.error("Errore durante il rendering delle pagine:", err);
+            } finally {
+                document.getElementById('pdfLoader').style.display = 'none';
+                isRendering = false;
+            }
+        }
+
+        function adjustZoom(delta) {
+            if (isRendering) return;
+            const nextZoom = currentZoom + delta;
+            if (nextZoom >= 0.3 && nextZoom <= 4.0) {
+                currentZoom = nextZoom;
+                renderPdfPages();
+            }
+        }
+
+        function closePdf() {
+            pdfModal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            pdfContainer.innerHTML = '';
+            currentPdf = null;
+        }
+
+        function renderSongs() {
+            const raw = searchInput.value;
+            const term = normalizeStr(raw);
+            if (clearSearchBtn) clearSearchBtn.classList.toggle('hidden', raw === "");
+
+            const filtered = songDatabase.filter(s => {
+                const matchesSearch = normalizeStr(s.titolo).includes(term) || normalizeStr(s.tags).includes(term);
+                const matchesFilter = currentFilter === 'all' || s.tonalita === currentFilter;
+                return matchesSearch && matchesFilter;
+            }).sort((a, b) => a.titolo.localeCompare(b.titolo));
+
+            resultsList.innerHTML = '';
+            resultsCount.innerText = filtered.length > 0 ? `${filtered.length} canti trovati` : '';
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+
+            filtered.forEach(song => {
+                const card = document.createElement('div');
+                card.className = "song-card bg-white p-4 rounded-2xl shadow-sm border border-stone-100 flex items-center justify-between cursor-pointer active:bg-amber-50";
+                card.onclick = () => openPdf(song.fileName, song.titolo);
+                const isM = song.tonalita === 'M';
+                card.innerHTML = `
+                    <div class="flex-1 pr-4">
+                        <h3 class="font-bold text-stone-800 text-base leading-tight">${song.titolo}</h3>
+                        <span class="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${isM ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}">
+                            ${isM ? 'Maschile' : 'Femminile'}
+                        </span>
+                    </div>
+                    <div class="p-3 bg-amber-500 text-white rounded-full shadow-md">
+                        <i data-lucide="eye" class="w-5 h-5"></i>
+                    </div>
+                `;
+                resultsList.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function setFilter(f) {
+            currentFilter = f;
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                // Reset dei bottoni
+                b.classList.remove('bg-amber-500', 'text-white', 'shadow-md', 'ring-0');
+                b.classList.add('bg-white', 'text-stone-600', 'ring-1', 'ring-stone-200');
+            });
+            
+            const activeBtn = document.getElementById(`btn-${f}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-white', 'text-stone-600', 'ring-1', 'ring-stone-200');
+                activeBtn.classList.add('bg-amber-500', 'text-white', 'shadow-md', 'ring-0');
+            }
+            renderSongs();
+        }
+
+        function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        window.onscroll = () => {
+            const btn = document.getElementById('backToTop');
+            if(btn) btn.style.display = (window.scrollY > 300) ? "block" : "none";
+        };
+
+        searchInput.addEventListener('input', renderSongs);
+        if(clearSearchBtn) {
+            clearSearchBtn.onclick = () => { searchInput.value = ""; renderSongs(); searchInput.focus(); };
+        }
+
+        window.onload = () => { 
+            setFilter('all');
+            lucide.createIcons(); 
+        };
+    </script>
+</body>
+</html>
